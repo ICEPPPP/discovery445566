@@ -60,4 +60,11 @@ def disconnect_device(mac):
     try:
         subprocess.run(f"bluetoothctl disconnect {mac}", shell=True, check=True)
         print("[+] Dispositivo desconectado com sucesso.")
-    except subprocess.CalledProces
+    except subprocess.CalledProcessError:
+        print("[-] Falha ao desconectar.")
+
+if __name__ == "__main__":
+    devices = scan_devices(timeout=10)
+    selected = choose_device(devices)
+    if selected:
+        disconnect_device(selected)
