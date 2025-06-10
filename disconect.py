@@ -1,60 +1,61 @@
-import subprocess
+import pexpect
 import time
 
-def scan_devices(scan_time=10):
-    print("[*] Escaneando dispositivos Bluetooth por", scan_time, "segundos...")
-    proc = subprocess.Popen("bluetoothctl", stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+def scan_devices(timeout=10):
+    print("[*] Iniciando bluetoothctl...")
+    bt = pexpect.spawn("bluetoothctl", encoding='utf-8', timeout=timeout)
+    bt.expect("#")  # Espera o prompt inicial
+    bt.sendline("scan on")
 
-    # Inicia o scan
-    proc.stdin.write("scan on\n")
-    proc.stdin.flush()
-    time.sleep(scan_time)
-    proc.stdin.write("scan off\n")
-    proc.stdin.write("devices\n")
-    proc.stdin.flush()
+    print(f"[*] Escaneando dispositivos por {timeout} segundos...\n")
+    time.sleep(timeout)
 
-    # Espera a saída
+    bt.sendline("scan off")
+    bt.sendline("devices")
     time.sleep(1)
-    output = proc.stdout.read()
-    proc.terminate()
 
-    # Filtra dispositivos
+    bt.expect("#")
+    output = bt.before
+    bt.sendline("exit")
+
+    # Parseando dispositivos
     devices = []
     for line in output.splitlines():
         if line.startswith("Device"):
             parts = line.strip().split(" ", 2)
-            if len(parts) >= 3:
+            if len(parts) == 3:
                 mac = parts[1]
                 name = parts[2]
                 devices.append((mac, name))
+
     return devices
 
 def choose_device(devices):
     if not devices:
         print("[-] Nenhum dispositivo encontrado.")
         return None
-    print("\nDispositivos encontrados:")
+    print("Dispositivos encontrados:")
     for i, (mac, name) in enumerate(devices):
-        print(f"{i + 1}. {name} ({mac})")
+        print(f"{i+1}. {name} ({mac})")
     while True:
         try:
-            choice = int(input("\nEscolha o número do dispositivo para desconectar: "))
+            choice = int(input("\nEscolha um número para desconectar: "))
             if 1 <= choice <= len(devices):
-                return devices[choice - 1][0]  # Retorna apenas o MAC
+                return devices[choice - 1][0]
         except ValueError:
             pass
-        print("Escolha inválida. Tente novamente.")
+        print("Entrada inválida. Tente novamente.")
 
 def disconnect_device(mac):
-    print(f"\n[*] Desconectando {mac}...")
+    print(f"\n[*] Tentando desconectar {mac}...")
     try:
-        subprocess.run(f"bluetoothctl disconnect {mac}", shell=True, check=True)
-        print("[+] Dispositivo desconectado com sucesso.")
-    except subprocess.CalledProcessError:
-        print("[-] Falha ao desconectar o dispositivo.")
+        result = pexpect.run(f"bluetoothctl disconnect {mac}", encoding='utf-8')
+        print(result)
+    except Exception as e:
+        print("Erro ao desconectar:", e)
 
 if __name__ == "__main__":
-    devices = scan_devices(scan_time=10)
+    devices = scan_devices(timeout=10)
     selected_mac = choose_device(devices)
     if selected_mac:
         disconnect_device(selected_mac)
